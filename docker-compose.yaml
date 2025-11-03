@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  ozonbomgebot:
+    image: ozonbomgebot:latest   # локально собранный образ
+    container_name: ozonbomgebot
+    restart: unless-stopped
+
+    volumes:
+      - ./app.jar:/app/app.jar:ro
+      - ./data:${APP_DATA_DIR}
+
+    environment:
+      APP_BOT_NAME: ${APP_BOT_NAME}
+      APP_BOT_TOKEN: ${APP_BOT_TOKEN}
+      APP_DATA_DIR: ${APP_DATA_DIR}
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
