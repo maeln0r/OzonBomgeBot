@@ -45,3 +45,14 @@ app:
   scheduler:
     cron: "0 */10 * * * *"
 
+  s3:
+    enabled: ${S3_ENABLED}
+    endpoint: ${S3_ENDPOINT}
+    bucket: ${S3_BUCKET}
+    accessKey: ${S3_ACCESS_KEY}
+    secretKey: ${S3_SECRET_KEY}
+    ensureBucket: ${S3_ENSURE_BUCKET}
+    connectTimeoutMs: 5000
+    writeTimeoutMs: 30000
+    readTimeoutMs: 30000
+

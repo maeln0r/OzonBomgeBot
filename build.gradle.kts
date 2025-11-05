@@ -33,6 +33,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
     implementation("org.flywaydb:flyway-core:11.14.1")
     implementation("org.jfree:jfreechart:1.5.6")
+    implementation("io.minio:minio:8.6.0")
 
 
     compileOnly("org.projectlombok:lombok:1.18.42")

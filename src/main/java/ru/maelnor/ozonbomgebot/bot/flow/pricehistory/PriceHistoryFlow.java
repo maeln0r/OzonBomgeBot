@@ -1,16 +1,14 @@
 package ru.maelnor.ozonbomgebot.bot.flow.pricehistory;
 
 import org.telegram.telegrambots.meta.api.objects.Update;
-import ru.maelnor.ozonbomgebot.bot.entity.TrackedItem;
 import ru.maelnor.ozonbomgebot.bot.flow.*;
 import ru.maelnor.ozonbomgebot.bot.flow.pricehistory.state.AskSkuState;
 import ru.maelnor.ozonbomgebot.bot.model.PricePoint;
+import ru.maelnor.ozonbomgebot.bot.service.ChartStorageService;
 import ru.maelnor.ozonbomgebot.bot.service.PriceChartBuilder;
 import ru.maelnor.ozonbomgebot.bot.service.PriceHistoryService;
 import ru.maelnor.ozonbomgebot.bot.service.TrackedItemService;
 
-import java.io.File;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,11 +16,13 @@ public final class PriceHistoryFlow implements Flow {
     public static final String FLOW_ID = "price_history";
     private final TrackedItemService trackedItemService;
     private final PriceHistoryService priceHistoryService;
+    private final ChartStorageService chartStorageService;
 
 
-    public PriceHistoryFlow(TrackedItemService tis, PriceHistoryService priceHistoryService) {
+    public PriceHistoryFlow(TrackedItemService tis, PriceHistoryService priceHistoryService, ChartStorageService chartStorageService) {
         this.trackedItemService = tis;
         this.priceHistoryService = priceHistoryService;
+        this.chartStorageService = chartStorageService;
     }
 
     @Override
@@ -67,21 +67,42 @@ public final class PriceHistoryFlow implements Flow {
                         .orElse("История цен • SKU " + sku);
 
                 try {
-                    // 3) рендерим картинку
-                    String tmpDir = System.getProperty("java.io.tmpdir");
-                    File out = Path.of(tmpDir,
-                            "price-" + sku + "-" + System.currentTimeMillis() + ".jpg").toFile();
+                    // 3) берём самый свежий timestamp
+                    long lastTs = points.stream()
+                            .mapToLong(PricePoint::createdAtMs)
+                            .max()
+                            .orElse(points.getLast().createdAtMs());
 
-                    new PriceChartBuilder(points, title)
-                            .buildChart(1280, 950, out.getAbsolutePath());
+                    java.io.File outFile;
 
-                    // 4) шлём фото
-                    io.sendPhoto(chatId, out, "📈 " + title);
-                    return Optional.of(FlowSignal.done(chatId, ctx.lastMessageId,
-                            "Готово ✅"));
+                    // 4) если включён S3 и актуальный график уже лежит — скачиваем и шлём
+                    if (chartStorageService.isEnabled() && chartStorageService.exists(sku, lastTs)) {
+                        byte[] jpeg = chartStorageService.download(sku, lastTs);
+                        outFile = java.io.File.createTempFile("price-" + sku + "-" + lastTs, ".jpg");
+                        java.nio.file.Files.write(outFile.toPath(), jpeg);
+                    } else {
+                        // 5) строим локально
+                        String tmpDir = System.getProperty("java.io.tmpdir");
+                        outFile = java.nio.file.Path.of(tmpDir,
+                                "price-" + sku + "-" + lastTs + ".jpg").toFile();
+
+                        new PriceChartBuilder(points, title)
+                                .buildChart(1280, 950, outFile.getAbsolutePath());
+
+                        // 6) если S3 включён — загружаем готовый JPEG
+                        if (chartStorageService.isEnabled()) {
+                            byte[] jpeg = java.nio.file.Files.readAllBytes(outFile.toPath());
+                            chartStorageService.upload(sku, lastTs, jpeg);
+                        }
+                    }
+
+                    // 7) шлём фото
+                    io.sendPhoto(chatId, outFile, "📈 " + title);
+                    return Optional.of(FlowSignal.done(chatId, ctx.lastMessageId, "Готово ✅"));
+
                 } catch (Exception e) {
                     return Optional.of(FlowSignal.done(chatId, ctx.lastMessageId,
-                            "❌ Не удалось построить график: " + e.getMessage()));
+                            "❌ Не удалось подготовить график: " + e.getMessage()));
                 }
             }
             case Next.Cancel c -> {

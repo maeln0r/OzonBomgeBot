@@ -7,6 +7,7 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import ru.maelnor.ozonbomgebot.bot.flow.FlowContext;
 import ru.maelnor.ozonbomgebot.bot.flow.FlowIO;
 import ru.maelnor.ozonbomgebot.bot.model.PricePoint;
+import ru.maelnor.ozonbomgebot.bot.service.ChartStorageService;
 import ru.maelnor.ozonbomgebot.bot.service.PriceChartBuilder;
 import ru.maelnor.ozonbomgebot.bot.service.PriceHistoryService;
 import ru.maelnor.ozonbomgebot.bot.service.TrackedItemService;
@@ -27,7 +28,9 @@ class PriceHistoryFlowTest {
         PriceHistoryService history = mock(PriceHistoryService.class);
         TrackedItemService trackedItemService = mock(TrackedItemService.class);
         PriceChartBuilder builder = mock(PriceChartBuilder.class);
-        PriceHistoryFlow flow = new PriceHistoryFlow(trackedItemService, history);
+        ChartStorageService  chartStorageService = mock(ChartStorageService.class);
+
+        PriceHistoryFlow flow = new PriceHistoryFlow(trackedItemService, history,  chartStorageService);
 
         FlowContext ctx = new FlowContext(100L, 200L, UUID.randomUUID(), Instant.now().plusSeconds(600));
         ctx.flowId = "price_history";
